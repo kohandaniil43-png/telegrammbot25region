@@ -5,9 +5,9 @@ import requests
 import json
 
 # ======= НАСТРОЙКИ (ЗАМЕНИ ЭТИ 3 СТРОЧКИ) =======
-TOKEN = "ТВОЙ_ТОКЕН_ОТ_BOTFATHER"
-CHANNEL_ID = -1001234567890
-ADMIN_ID = 123456789
+TOKEN = "8980303731:AAGSbV7t9E49_nVsjmT4QcWALWYzHkz0_rA"
+CHANNEL_ID = -1004336857767
+ADMIN_ID = 1912704977
 # =================================================
 
 app = Flask(__name__)
