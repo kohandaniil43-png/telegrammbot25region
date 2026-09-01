@@ -3,13 +3,11 @@ import re
 from flask import Flask, request, jsonify
 import requests
 import json
-from datetime import datetime
-import os
 
 # ======= НАСТРОЙКИ (ЗАМЕНИ ЭТИ 3 СТРОЧКИ) =======
-TOKEN = "8980303731:AAGSbV7t9E49_nVsjmT4QcWALWYzHkz0_rA"
-CHANNEL_ID = -1004336857767  # ID канала с минусом
-ADMIN_ID = 1912704977 # ТВОЙ Telegram ID
+TOKEN = "ТВОЙ_ТОКЕН_ОТ_BOTFATHER"
+CHANNEL_ID = -1001234567890
+ADMIN_ID = 123456789
 # =================================================
 
 app = Flask(__name__)
@@ -38,18 +36,14 @@ def edit_telegram(chat_id, message_id, text, reply_markup=None):
 def check_template(text):
     errors = []
     warnings = []
-    
     if not re.search(r'\d+\s*[/\-]\s*\d+|\d+\s*руб|\d+\s*в час', text, re.IGNORECASE):
-        errors.append("💰 Укажи зарплату (например: 500/1 или 1000 в час)")
-    
+        errors.append("💰 Укажи зарплату (например: 500/1)")
     if not re.search(r'(\+7|8)\s*\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}', text):
-        errors.append("📱 Укажи номер телефона (например: +7 999 123 45 67)")
-    
-    if not re.search(r'место|адрес|метро|станция', text, re.IGNORECASE):
+        errors.append("📱 Укажи номер телефона")
+    if not re.search(r'место|адрес|метро', text, re.IGNORECASE):
         warnings.append("📍 Укажи место работы (желательно)")
-    if not re.search(r'часов|\d+\s*ч|время|во сколько', text, re.IGNORECASE):
-        warnings.append("⏰ Укажи время и сколько часов (желательно)")
-    
+    if not re.search(r'часов|\d+\s*ч|время', text, re.IGNORECASE):
+        warnings.append("⏰ Укажи время (желательно)")
     return errors, warnings
 
 def get_main_menu():
@@ -86,30 +80,27 @@ def webhook():
         message_id = callback['message']['message_id']
         chat_id = callback['message']['chat']['id']
         action = callback['data']
-        
         if user_id != ADMIN_ID:
             send_telegram(user_id, "⛔ Нет прав!")
             return jsonify({"status": "ok"})
-        
         if action == "admin_stats":
             cursor.execute('SELECT total_approved, total_rejected FROM stats')
             appr, rej = cursor.fetchone()
-            text = f"📊 СТАТИСТИКА\n\n✅ Одобрено: {appr}\n❌ Отклонено: {rej}\n👥 Всего: {cursor.execute('SELECT COUNT(*) FROM users').fetchone()[0]}"
+            text = f"📊 Статистика\n✅ {appr}\n❌ {rej}"
             edit_telegram(chat_id, message_id, text, admin_inline_buttons())
         elif action == "admin_banned":
             cursor.execute('SELECT id FROM users WHERE banned = 1')
             banned = cursor.fetchall()
-            text = "🚫 ЗАБАНЕННЫЕ:\n\n" + "\n".join([f"🔹 {b[0]}" for b in banned]) if banned else "✅ Нет забаненных"
+            text = "🚫 Забаненные:\n" + "\n".join([str(b[0]) for b in banned]) if banned else "✅ Нет"
             edit_telegram(chat_id, message_id, text, admin_inline_buttons())
         elif action == "admin_write":
-            edit_telegram(chat_id, message_id, "✍️ Введи: ID текст\nПример: 123456789 Привет!", admin_inline_buttons())
+            edit_telegram(chat_id, message_id, "Введи: ID текст", admin_inline_buttons())
         elif action == "admin_ban":
-            edit_telegram(chat_id, message_id, "🔨 Введи ID для бана:", admin_inline_buttons())
+            edit_telegram(chat_id, message_id, "Введи ID для бана:", admin_inline_buttons())
         elif action == "admin_unban":
-            edit_telegram(chat_id, message_id, "🔓 Введи ID для разбана:", admin_inline_buttons())
+            edit_telegram(chat_id, message_id, "Введи ID для разбана:", admin_inline_buttons())
         elif action == "admin_mailing":
-            edit_telegram(chat_id, message_id, "📢 Введи текст рассылки:", admin_inline_buttons())
-        
+            edit_telegram(chat_id, message_id, "Введи текст рассылки:", admin_inline_buttons())
         return jsonify({"status": "ok"})
     
     if 'message' not in data:
@@ -132,61 +123,45 @@ def webhook():
         send_telegram(user_id, "🚫 Ты забанен.", get_main_menu())
         return jsonify({"status": "ok"})
     
-    if text == "📝 Отправить объявление":
-        send_telegram(user_id, "📝 Напиши текст с зарплатой и телефоном", get_main_menu())
-        return jsonify({"status": "ok"})
-    
-    if text == "ℹ️ Помощь":
-        send_telegram(user_id, "🤖 Бот для публикации вакансий\n\n/start - начать\n/admin - админ-панель", get_main_menu())
-        return jsonify({"status": "ok"})
-    
-    if text == "📊 Статистика":
-        cursor.execute('SELECT total_approved, total_rejected FROM stats')
-        appr, rej = cursor.fetchone()
-        send_telegram(user_id, f"📊 Статистика\n\n✅ Одобрено: {appr}\n❌ Отклонено: {rej}", get_main_menu())
-        return jsonify({"status": "ok"})
-    
-    if text == "👤 Мой профиль":
-        cursor.execute('SELECT banned FROM users WHERE id = ?', (user_id,))
-        banned = cursor.fetchone()
-        status = "🚫 Забанен" if banned and banned[0] else "✅ Активен"
-        send_telegram(user_id, f"👤 Профиль\n\n🆔 ID: {user_id}\n👤 @{username}\n📊 {status}", get_main_menu())
+    if text in ["📝 Отправить объявление", "ℹ️ Помощь", "📊 Статистика", "👤 Мой профиль"]:
+        if text == "📝 Отправить объявление":
+            send_telegram(user_id, "📝 Напиши текст с зарплатой и телефоном", get_main_menu())
+        elif text == "ℹ️ Помощь":
+            send_telegram(user_id, "🤖 Бот для вакансий\n/start - начать\n/admin - админ-панель", get_main_menu())
+        elif text == "📊 Статистика":
+            cursor.execute('SELECT total_approved, total_rejected FROM stats')
+            appr, rej = cursor.fetchone()
+            send_telegram(user_id, f"📊 Статистика\n✅ {appr}\n❌ {rej}", get_main_menu())
+        elif text == "👤 Мой профиль":
+            send_telegram(user_id, f"👤 Профиль\n🆔 {user_id}\n👤 @{username}", get_main_menu())
         return jsonify({"status": "ok"})
     
     if text == '/admin' and user_id == ADMIN_ID:
-        send_telegram(user_id, "⚙️ АДМИН-ПАНЕЛЬ", admin_inline_buttons())
+        send_telegram(user_id, "⚙️ Админ-панель", admin_inline_buttons())
         return jsonify({"status": "ok"})
     
     if user_id == ADMIN_ID:
         if text.startswith('/ban '):
-            parts = text.split()
-            if len(parts) == 2 and parts[1].isdigit():
-                target = int(parts[1])
-                cursor.execute('UPDATE users SET banned = 1 WHERE id = ?', (target,))
-                conn.commit()
-                send_telegram(user_id, f"✅ {target} забанен", get_main_menu())
+            target = int(text.split()[1])
+            cursor.execute('UPDATE users SET banned = 1 WHERE id = ?', (target,))
+            conn.commit()
+            send_telegram(user_id, f"✅ {target} забанен", get_main_menu())
             return jsonify({"status": "ok"})
-        
         if text.startswith('/unban '):
-            parts = text.split()
-            if len(parts) == 2 and parts[1].isdigit():
-                target = int(parts[1])
-                cursor.execute('UPDATE users SET banned = 0 WHERE id = ?', (target,))
-                conn.commit()
-                send_telegram(user_id, f"✅ {target} разбанен", get_main_menu())
+            target = int(text.split()[1])
+            cursor.execute('UPDATE users SET banned = 0 WHERE id = ?', (target,))
+            conn.commit()
+            send_telegram(user_id, f"✅ {target} разбанен", get_main_menu())
             return jsonify({"status": "ok"})
-        
         if text.startswith('/msg '):
             parts = text.split(maxsplit=2)
-            if len(parts) == 3 and parts[1].isdigit():
-                target = int(parts[1])
+            if len(parts) == 3:
                 try:
-                    send_telegram(target, f"📩 От админа:\n{parts[2]}")
-                    send_telegram(user_id, f"✅ Отправлено {target}", get_main_menu())
+                    send_telegram(int(parts[1]), f"📩 От админа:\n{parts[2]}")
+                    send_telegram(user_id, "✅ Отправлено", get_main_menu())
                 except:
-                    send_telegram(user_id, "❌ Не отправлено", get_main_menu())
+                    send_telegram(user_id, "❌ Ошибка", get_main_menu())
             return jsonify({"status": "ok"})
-        
         if text.startswith('/mail '):
             mail_text = text[6:]
             cursor.execute('SELECT id FROM users')
@@ -194,7 +169,7 @@ def webhook():
             count = 0
             for user in users:
                 try:
-                    send_telegram(user[0], f"📢 РАССЫЛКА\n\n{mail_text}")
+                    send_telegram(user[0], f"📢 Рассылка\n\n{mail_text}")
                     count += 1
                 except:
                     pass
@@ -202,20 +177,19 @@ def webhook():
             return jsonify({"status": "ok"})
     
     errors, warnings = check_template(text)
-    
     if errors:
         cursor.execute('UPDATE stats SET total_rejected = total_rejected + 1')
         conn.commit()
-        send_telegram(user_id, "❌ Ошибки:\n" + "\n".join([f"• {e}" for e in errors]), get_main_menu())
+        send_telegram(user_id, "❌ Ошибки:\n" + "\n".join(errors), get_main_menu())
         return jsonify({"status": "ok"})
     
     try:
-        send_telegram(CHANNEL_ID, f"📢 НОВАЯ ВАКАНСИЯ\n\n{text}\n\n👤 @{username}")
+        send_telegram(CHANNEL_ID, f"📢 ВАКАНСИЯ\n\n{text}\n\n👤 @{username}")
         cursor.execute('UPDATE stats SET total_approved = total_approved + 1')
         conn.commit()
-        reply = "✅ ОПУБЛИКОВАНО!"
+        reply = "✅ Опубликовано!"
         if warnings:
-            reply += "\n\n⚠️ На будущее:\n" + "\n".join([f"• {w}" for w in warnings])
+            reply += "\n⚠️ " + "\n".join(warnings)
         send_telegram(user_id, reply, get_main_menu())
     except Exception as e:
         send_telegram(user_id, f"❌ Ошибка: {str(e)}", get_main_menu())
@@ -223,5 +197,4 @@ def webhook():
     return jsonify({"status": "ok"})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8080)
